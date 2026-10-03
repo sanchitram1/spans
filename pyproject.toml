@@ -1,13 +1,56 @@
 [project]
 name = "spans"
 version = "0.1.0"
-description = "Add your description here"
+description = "ax-spans: deterministic OpenInference span fixture generator"
 readme = "README.md"
 authors = [
     { name = "Sanchit Ram Arvind", email = "sarvind@arize.com" }
 ]
 requires-python = ">=3.13"
 dependencies = []
+
+[project.scripts]
+ax-spans = "spans.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "ruff>=0.14",
+    "ty>=0.0.1alpha",
+]
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "RUF",
+    "PL",
+    "RET",
+    "ARG",
+    "PTH",
+    "PERF",
+]
+ignore = [
+    "PLR0913", # span builders legitimately take many keyword arguments
+    "PLR0917", # same, for positional-style internal builders
+    "SIM905",  # the word list reads better as a split multiline string
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["uv_build>=0.12.12,<0.13.0"]
