@@ -2,11 +2,19 @@
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 from .config import Config
 from .generate import Generator
+from .ingest import (
+    API_KEY_ENV,
+    ENDPOINT_ENV,
+    SPACE_KEY_ENV,
+    IngestError,
+    ingest,
+)
 from .writer import write
 
 
@@ -123,16 +131,75 @@ def parser() -> argparse.ArgumentParser:
         help="share of spans within session traces that omit session.id; at least "
         "one span per session trace retains it (default: %(default)s)",
     )
+    command = commands.add_parser(
+        "ingest", help="ingest a fixture bundle over OTLP/HTTP JSON"
+    )
+    command.add_argument(
+        "fixture", type=Path, help="fixture directory holding manifest.json"
+    )
+    command.add_argument(
+        "--otlp-http-endpoint",
+        help=f"complete OTLP/HTTP JSON endpoint, e.g. http://localhost:4318/v1/traces "
+        f"(or {ENDPOINT_ENV})",
+    )
+    command.add_argument(
+        "--space-key",
+        help=f"receiver space key header (or {SPACE_KEY_ENV})",
+    )
+    command.add_argument(
+        "--api-key",
+        help=f"receiver API key header (or {API_KEY_ENV})",
+    )
+    command.add_argument(
+        "--max-retries",
+        type=int,
+        default=5,
+        help="retries for safe connection failures (default: %(default)s)",
+    )
+    command.add_argument(
+        "--timeout",
+        type=float,
+        default=30.0,
+        help="per-request connect and response timeout in seconds "
+        "(default: %(default)s)",
+    )
     return result
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
+        if args.command == "ingest":
+            return _ingest(args)
         return _generate(args)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, IngestError) as exc:
         print(f"ax-spans: {exc}", file=sys.stderr)
         return 1
+
+
+def _ingest(args: argparse.Namespace) -> int:
+    endpoint = _required(args.otlp_http_endpoint, ENDPOINT_ENV, "--otlp-http-endpoint")
+    space_key = _required(args.space_key, SPACE_KEY_ENV, "--space-key")
+    api_key = _required(args.api_key, API_KEY_ENV, "--api-key")
+    summary = ingest(
+        args.fixture,
+        endpoint,
+        space_key,
+        api_key,
+        max_retries=args.max_retries,
+        timeout=args.timeout,
+    )
+    print(json.dumps(summary, indent=2, sort_keys=True))
+    return 0
+
+
+def _required(value: str | None, env: str, flag: str) -> str:
+    if value is not None:
+        return value
+    supplied = os.environ.get(env)
+    if supplied is not None:
+        return supplied
+    raise ValueError(f"{flag} or {env} is required")
 
 
 def _generate(args: argparse.Namespace) -> int:
