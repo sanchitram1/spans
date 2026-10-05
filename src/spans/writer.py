@@ -132,6 +132,8 @@ def _write_bundle(config: Config, staging: Path) -> tuple[dict, dict]:
             ("start_time", pa.timestamp("ns", tz="UTC")),
             ("total_tokens", pa.int64()),
             ("total_cost", pa.float64()),
+            ("parent_span_id", pa.string()),
+            ("span_session_id", pa.string()),
         ]
     )
     table = pa.Table.from_pydict(generator.parquet_data, schema=schema)

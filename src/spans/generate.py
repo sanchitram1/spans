@@ -121,6 +121,8 @@ class Generator:
             "start_time": [],
             "total_tokens": [],
             "total_cost": [],
+            "parent_span_id": [],
+            "span_session_id": [],
         }
 
     def __iter__(self) -> Iterator[tuple[str, int]]:
@@ -259,6 +261,8 @@ class Generator:
         self.parquet_data["total_cost"].append(
             round(prompt * 3e-6 + completion * 1.5e-5, 6)
         )
+        self.parquet_data["parent_span_id"].append(parent_id or None)
+        self.parquet_data["span_session_id"].append(session_id or None)
 
         return otlp.span(
             trace_id=trace_id,

@@ -77,6 +77,8 @@ def test_output_dir_mode_writes_bundle(capsys, tmp_path):
         "start_time",
         "total_tokens",
         "total_cost",
+        "parent_span_id",
+        "span_session_id",
     ]
 
 
