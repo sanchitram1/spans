@@ -156,8 +156,17 @@ class Generator:
             )
         else:
             keep_index = None
-        trace_start = config.start_ns + generator.randrange(config.days * DAY_NS)
-        window_end = config.start_ns + config.days * DAY_NS
+        session_index = self.plan.session_of_trace.get(trace_index)
+        if session_index is None:
+            trace_start = config.start_ns + generator.randrange(config.days * DAY_NS)
+            window_end = config.start_ns + config.days * DAY_NS
+        else:
+            day = rng(config.namespace, "session-day", session_index).randrange(
+                config.days
+            )
+            day_start = config.start_ns + day * DAY_NS
+            trace_start = day_start + generator.randrange(DAY_NS)
+            window_end = day_start + DAY_NS
         roots: list[tuple[int, int]] = []
         for position in range(span_count):
             span_id = hex_id(config.namespace, "span", trace_index, position, length=16)
