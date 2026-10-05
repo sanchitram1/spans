@@ -7,7 +7,9 @@ authors = [
     { name = "Sanchit Ram Arvind", email = "sarvind@arize.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "pyarrow>=15.0.0",
+]
 
 [project.scripts]
 ax-spans = "spans.cli:main"

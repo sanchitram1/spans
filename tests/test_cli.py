@@ -2,6 +2,8 @@
 
 import json
 
+import pyarrow.parquet as pq
+
 from spans.cli import main
 from spans.config import Config
 
@@ -60,6 +62,22 @@ def test_output_dir_mode_writes_bundle(capsys, tmp_path):
     assert len(manifest["files"]) == 8
     assert oracle_document["counts"]["spans"] == 40
     assert len(read_spans(output)) == sum(entry["spans"] for entry in manifest["files"])
+
+    # Check parquet file existence and content
+    parquet_path = output / "spans.parquet"
+    assert parquet_path.exists()
+
+    table = pq.read_table(parquet_path)
+    assert len(table) == 40
+    assert table.column_names == [
+        "span_id",
+        "trace_id",
+        "session_id",
+        "span_kind",
+        "start_time",
+        "total_tokens",
+        "total_cost",
+    ]
 
 
 def test_output_dir_batch_matches_stdout_spans(capsys, tmp_path):

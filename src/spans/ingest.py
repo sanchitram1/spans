@@ -336,6 +336,7 @@ class Transport:
                 f"receiver returned HTTP {status}", _retry_after(response)
             )
         if status not in _SUCCESS_STATUSES:
+            print(json.loads(body) if body.strip() else {})
             raise SendError(f"receiver returned HTTP {status}")
         try:
             document = json.loads(body) if body.strip() else {}

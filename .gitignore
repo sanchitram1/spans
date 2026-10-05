@@ -11,3 +11,4 @@ wheels/
 
 # output
 fixtures/
+.arize-tmp-traces/

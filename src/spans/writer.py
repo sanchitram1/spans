@@ -7,6 +7,9 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 from .config import GENERATOR_VERSION, Config
 from .generate import Generator
 
@@ -72,6 +75,7 @@ def _verified_bundle(output: Path, config: Config) -> tuple[dict, dict] | None:
     expected = {entry["path"] for entry in manifest.get("files", [])} | {
         "manifest.json",
         "oracle.json",
+        "spans.parquet",
     }
     if entries != expected:
         raise ValueError(
@@ -79,6 +83,17 @@ def _verified_bundle(output: Path, config: Config) -> tuple[dict, dict] | None:
             f"found {sorted(entries)}; remove the directory to regenerate"
         )
     for entry in manifest["files"]:
+        payload = (output / entry["path"]).read_bytes()
+        if (
+            len(payload) != entry["bytes"]
+            or hashlib.sha256(payload).hexdigest() != entry["sha256"]
+        ):
+            raise ValueError(
+                f"{output}/{entry['path']} fails checksum; fixture is corrupt, "
+                "remove the directory to regenerate"
+            )
+    if "parquet" in manifest:
+        entry = manifest["parquet"]
         payload = (output / entry["path"]).read_bytes()
         if (
             len(payload) != entry["bytes"]
@@ -106,6 +121,25 @@ def _write_bundle(config: Config, staging: Path) -> tuple[dict, dict]:
                 "sha256": hashlib.sha256(payload).hexdigest(),
             }
         )
+
+    # Write the parquet span table
+    schema = pa.schema(
+        [
+            ("span_id", pa.string()),
+            ("trace_id", pa.string()),
+            ("session_id", pa.string()),
+            ("span_kind", pa.string()),
+            ("start_time", pa.timestamp("ns", tz="UTC")),
+            ("total_tokens", pa.int64()),
+            ("total_cost", pa.float64()),
+        ]
+    )
+    table = pa.Table.from_pydict(generator.parquet_data, schema=schema)
+    parquet_path = staging / "spans.parquet"
+    pq.write_table(table, parquet_path)
+
+    parquet_payload = parquet_path.read_bytes()
+
     manifest = {
         "generator_version": GENERATOR_VERSION,
         "seed": config.seed,
@@ -113,6 +147,11 @@ def _write_bundle(config: Config, staging: Path) -> tuple[dict, dict]:
         "batch_spans": config.batch_spans,
         "files": files,
         "total_bytes": sum(entry["bytes"] for entry in files),
+        "parquet": {
+            "path": "spans.parquet",
+            "bytes": len(parquet_payload),
+            "sha256": hashlib.sha256(parquet_payload).hexdigest(),
+        },
     }
     oracle_document = {
         "counts": generator.oracle.summary(),

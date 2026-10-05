@@ -1,5 +1,6 @@
 """Deterministic streaming span fixture generation."""
 
+import datetime
 import random
 from collections.abc import Iterator
 from typing import Any
@@ -112,6 +113,15 @@ class Generator:
         self.config = config.validate()
         self.oracle = Oracle()
         self.plan = Plan(self.config)
+        self.parquet_data: dict[str, list[Any]] = {
+            "span_id": [],
+            "trace_id": [],
+            "session_id": [],
+            "span_kind": [],
+            "start_time": [],
+            "total_tokens": [],
+            "total_cost": [],
+        }
 
     def __iter__(self) -> Iterator[tuple[str, int]]:
         config = self.config
@@ -238,6 +248,18 @@ class Generator:
         else:
             oracle.chain_spans += 1
         oracle.spans += 1
+
+        self.parquet_data["span_id"].append(span_id)
+        self.parquet_data["trace_id"].append(trace_id)
+        self.parquet_data["session_id"].append(trace_session_id)
+        self.parquet_data["span_kind"].append(kind)
+        dt = datetime.datetime.fromtimestamp(start_ns / 1_000_000_000, tz=datetime.UTC)
+        self.parquet_data["start_time"].append(dt)
+        self.parquet_data["total_tokens"].append(prompt + completion)
+        self.parquet_data["total_cost"].append(
+            round(prompt * 3e-6 + completion * 1.5e-5, 6)
+        )
+
         return otlp.span(
             trace_id=trace_id,
             span_id=span_id,
