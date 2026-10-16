@@ -1,6 +1,7 @@
 """Deterministic streaming span fixture generation."""
 
 import datetime
+import heapq
 import random
 from collections.abc import Iterator
 from typing import Any
@@ -136,13 +137,53 @@ class Generator:
         if buffer:
             yield otlp.request_line(buffer, config.project), len(buffer)
 
+    def _trace_window(self, trace_index: int) -> tuple[int, int]:
+        """Return the (start, window end) of a trace; a pure function of its index."""
+        config = self.config
+        generator = rng(config.namespace, "trace-start", trace_index)
+        session_index = self.plan.session_of_trace.get(trace_index)
+        if session_index is None:
+            trace_start = config.start_ns + generator.randrange(config.days * DAY_NS)
+            return trace_start, config.start_ns + config.days * DAY_NS
+        day = rng(config.namespace, "session-day", session_index).randrange(config.days)
+        day_start = config.start_ns + day * DAY_NS
+        return day_start + generator.randrange(DAY_NS), day_start + DAY_NS
+
     def _spans(self) -> Iterator[dict[str, Any]]:
-        for trace_index in range(self.config.number_of_traces):
-            yield from self._trace_spans(trace_index)
-        self.oracle.traces = self.config.number_of_traces
+        """Yield spans in non-decreasing start order.
+
+        Traces are visited by start time. Every span starts at or after its
+        trace's start, so once the next trace begins, any buffered span that
+        starts no later than it can never be overtaken and is safe to emit.
+        Ties break on (trace rank, position), keeping roots before children.
+        """
+        count = self.config.number_of_traces
+        windows = [self._trace_window(index) for index in range(count)]
+        order = sorted(range(count), key=lambda index: (windows[index][0], index))
+        pending: list[tuple[int, int, int, dict[str, Any], dict[str, Any]]] = []
+        for rank, trace_index in enumerate(order):
+            trace_start, window_end = windows[trace_index]
+            while pending and pending[0][0] <= trace_start:
+                yield self._emit(heapq.heappop(pending))
+            for position, (span, row) in enumerate(
+                self._trace_spans(trace_index, trace_start, window_end)
+            ):
+                start_ns = int(span["startTimeUnixNano"])
+                heapq.heappush(pending, (start_ns, rank, position, span, row))
+        while pending:
+            yield self._emit(heapq.heappop(pending))
+        self.oracle.traces = count
         self.oracle.sessions = self.plan.session_count
 
-    def _trace_spans(self, trace_index: int) -> Iterator[dict[str, Any]]:
+    def _emit(self, item: tuple[int, int, int, dict[str, Any], dict[str, Any]]):
+        *_, span, row = item
+        for column, value in row.items():
+            self.parquet_data[column].append(value)
+        return span
+
+    def _trace_spans(
+        self, trace_index: int, trace_start: int, window_end: int
+    ) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
         config = self.config
         generator = rng(config.namespace, "trace", trace_index)
         trace_id = hex_id(config.namespace, "trace", trace_index, length=32)
@@ -156,17 +197,6 @@ class Generator:
             )
         else:
             keep_index = None
-        session_index = self.plan.session_of_trace.get(trace_index)
-        if session_index is None:
-            trace_start = config.start_ns + generator.randrange(config.days * DAY_NS)
-            window_end = config.start_ns + config.days * DAY_NS
-        else:
-            day = rng(config.namespace, "session-day", session_index).randrange(
-                config.days
-            )
-            day_start = config.start_ns + day * DAY_NS
-            trace_start = day_start + generator.randrange(DAY_NS)
-            window_end = day_start + DAY_NS
         roots: list[tuple[int, int]] = []
         for position in range(span_count):
             span_id = hex_id(config.namespace, "span", trace_index, position, length=16)
@@ -231,7 +261,7 @@ class Generator:
         end_ns: int,
         session_id: str | None,
         trace_session_id: str | None,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         config = self.config
         oracle = self.oracle
         if trace_session_id is None:
@@ -260,20 +290,21 @@ class Generator:
             oracle.chain_spans += 1
         oracle.spans += 1
 
-        self.parquet_data["span_id"].append(span_id)
-        self.parquet_data["trace_id"].append(trace_id)
-        self.parquet_data["session_id"].append(trace_session_id)
-        self.parquet_data["span_kind"].append(kind)
-        dt = datetime.datetime.fromtimestamp(start_ns / 1_000_000_000, tz=datetime.UTC)
-        self.parquet_data["start_time"].append(dt)
-        self.parquet_data["total_tokens"].append(prompt + completion)
-        self.parquet_data["total_cost"].append(
-            round(prompt * 3e-6 + completion * 1.5e-5, 6)
-        )
-        self.parquet_data["parent_span_id"].append(parent_id or None)
-        self.parquet_data["span_session_id"].append(session_id or None)
+        row = {
+            "span_id": span_id,
+            "trace_id": trace_id,
+            "session_id": trace_session_id,
+            "span_kind": kind,
+            "start_time": datetime.datetime.fromtimestamp(
+                start_ns / 1_000_000_000, tz=datetime.UTC
+            ),
+            "total_tokens": prompt + completion,
+            "total_cost": round(prompt * 3e-6 + completion * 1.5e-5, 6),
+            "parent_span_id": parent_id or None,
+            "span_session_id": session_id or None,
+        }
 
-        return otlp.span(
+        span = otlp.span(
             trace_id=trace_id,
             span_id=span_id,
             parent_id=parent_id,
@@ -288,3 +319,4 @@ class Generator:
             output_value=output_value,
             model=model,
         )
+        return span, row

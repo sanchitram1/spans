@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from functools import cached_property
 
-GENERATOR_VERSION = 1
+GENERATOR_VERSION = 2
 
 DEFAULT_SEED = 42
 DEFAULT_START = "2026-03-18T00:00:00Z"

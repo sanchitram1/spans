@@ -5,7 +5,7 @@ import json
 import pyarrow.parquet as pq
 
 from spans.cli import main
-from spans.config import Config
+from spans.config import GENERATOR_VERSION, Config
 
 SMALL_ARGS = [
     "generate",
@@ -57,7 +57,7 @@ def test_output_dir_mode_writes_bundle(capsys, tmp_path):
     manifest = json.loads((output / "manifest.json").read_text())
     oracle_document = json.loads((output / "oracle.json").read_text())
     assert manifest["seed"] == 42
-    assert manifest["generator_version"] == 1
+    assert manifest["generator_version"] == GENERATOR_VERSION
     assert manifest["config"]["number_of_spans"] == 40
     assert len(manifest["files"]) == 8
     assert oracle_document["counts"]["spans"] == 40
@@ -122,7 +122,7 @@ def test_refuses_corrupt_fixture(tmp_path, capsys):
     output = tmp_path / "bundle"
     assert main([*SMALL_ARGS, "--output-dir", str(output)]) == 0
     batch = next(iter(sorted(output.glob("traces-*.jsonl"))))
-    batch.write_text(batch.read_text().replace("chain", "chian"))
+    batch.write_text(batch.read_text().replace("ax-spans", "ax-spanz"))
     code = main([*SMALL_ARGS, "--output-dir", str(output)])
     assert code == 1
     assert "checksum" in capsys.readouterr().err
