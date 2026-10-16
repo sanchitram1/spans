@@ -9,7 +9,10 @@ def _rows(config):
     generator = Generator(config)
     spans = collect_spans(generator)
     data = generator.parquet_data
-    rows = [dict(zip(data.keys(), values, strict=True)) for values in zip(*data.values(), strict=True)]
+    rows = [
+        dict(zip(data.keys(), values, strict=True))
+        for values in zip(*data.values(), strict=True)
+    ]
     return spans, rows
 
 
