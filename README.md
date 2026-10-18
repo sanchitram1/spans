@@ -112,7 +112,8 @@ completion.
 limits and the per-request timeout.
 
  
-> [!note] Successful ingestion does not prove that the spans reached Druid
+> [!note]
+> Successful ingestion does not prove that the spans reached Druid
 > Success means the receiver accepted every span. If Druid's capacity is hit,
 > then the spans will not be accepted. This is because Receiver → Gazette →
 > model discovery → Druid loading is asynchronous.
