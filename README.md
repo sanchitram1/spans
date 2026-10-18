@@ -113,7 +113,11 @@ limits and the per-request timeout.
 
  
 > [!note]
-> Successful ingestion does not prove that the spans reached Druid
+> Successful ingestion does not prove that the spans reached Druid.
 > Success means the receiver accepted every span. If Druid's capacity is hit,
 > then the spans will not be accepted. This is because Receiver → Gazette →
-> model discovery → Druid loading is asynchronous.
+> model discovery → Druid loading is asynchronous. Some common issues:
+> - Restart / redeploy the receiver in case it rejects spans
+> - Gazette's throughput is much slower than the receiver's. Once the receiver
+> accepts everything, the spans still need to move from the journal into Druid,
+> which could take time on a sufficiently large fixture size
