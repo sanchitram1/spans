@@ -272,8 +272,12 @@ class Generator:
             oracle.spans_without_session_id += 1
         kind_rng = rng(config.namespace, "kind", trace_id, span_id)
         kind = "LLM" if kind_rng.random() < config.llm_fraction else "CHAIN"
-        input_value = otlp.text_value(trace_id, span_id, "input")
-        output_value = otlp.text_value(trace_id, span_id, "output")
+        input_value = otlp.text_value(
+            trace_id, span_id, "input", config.min_text_bytes, config.max_text_bytes
+        )
+        output_value = otlp.text_value(
+            trace_id, span_id, "output", config.min_text_bytes, config.max_text_bytes
+        )
         oracle.text_bytes += len(input_value) + len(output_value)
         token_rng = rng(config.namespace, "tokens", trace_id, span_id)
         prompt = token_rng.randint(1, 2048)

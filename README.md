@@ -60,6 +60,8 @@ traces that omit `session.id`. Omissions may affect root or child spans and are
 assigned deterministically from the seed. At least one span in every
 session-associated trace must retain `session.id` so the association remains
 observable.
+- `--text-bytes 512:4096`: bounds for `input.value`/`output.value` text size in
+bytes, sampled from a uniform distribution.
 
 With `--output-dir/-o PATH` it writes a fixture bundle: batched
 `ExportTraceServiceRequest` files, `manifest.json`, and `oracle.json` (the

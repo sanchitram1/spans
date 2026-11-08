@@ -66,6 +66,8 @@ class Config:
     days: int = 7
     llm_fraction: float = 0.7
     session_id_missing_fraction: float = 0.25
+    min_text_bytes: int = 512
+    max_text_bytes: int = 4096
     project: str = DEFAULT_PROJECT
     seed: int = DEFAULT_SEED
     batch_spans: int = 10_000
@@ -109,6 +111,8 @@ class Config:
             raise ValueError("roots-per-trace range must satisfy 1 <= MIN <= MAX")
         if self.days < 1:
             raise ValueError("days must be >= 1")
+        if not 1 <= self.min_text_bytes <= self.max_text_bytes:
+            raise ValueError("text-bytes range must satisfy 1 <= MIN <= MAX")
         for name in ("llm_fraction", "session_id_missing_fraction"):
             if not 0.0 <= getattr(self, name) <= 1.0:
                 raise ValueError(f"{name} must be within [0, 1]")

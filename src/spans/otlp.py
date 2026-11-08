@@ -11,8 +11,6 @@ SPAN_KIND_KEY = "openinference.span.kind"
 
 MODEL_NAMES = ("gpt-4.1-mini", "claude-sonnet-4.5", "gemini-2.5-pro")
 
-TEXT_MIN_BYTES = 512
-TEXT_MAX_BYTES = 4096
 TEXT_NONCE_INTERVAL = 4
 _TEXT_WORD_SKEW_EXPONENT = 1.7
 
@@ -50,10 +48,12 @@ def double_attr(key: str, value: float) -> dict:
     return {"key": key, "value": {"doubleValue": value}}
 
 
-def text_value(trace_id: str, span_id: str, field: str) -> str:
+def text_value(
+    trace_id: str, span_id: str, field: str, min_bytes: int, max_bytes: int
+) -> str:
     """Unique deterministic ASCII text: random words plus hex nonce tokens."""
     generator = rng("text", trace_id, span_id, field)
-    size = generator.randint(TEXT_MIN_BYTES, TEXT_MAX_BYTES)
+    size = generator.randint(min_bytes, max_bytes)
     parts = [f"{span_id}:{field} "]
     length = len(parts[0])
     words_since_nonce = 0
