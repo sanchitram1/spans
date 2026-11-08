@@ -131,6 +131,14 @@ def parser() -> argparse.ArgumentParser:
         help="share of spans within session traces that omit session.id; at least "
         "one span per session trace retains it (default: %(default)s)",
     )
+    command.add_argument(
+        "--text-bytes",
+        type=_pair,
+        default=(512, 4096),
+        metavar="MIN:MAX",
+        help="bounds for input.value/output.value text size in bytes "
+        "(default: %(default)s)",
+    )
     command = commands.add_parser(
         "ingest", help="ingest a fixture bundle over OTLP/HTTP JSON"
     )
@@ -206,6 +214,7 @@ def _generate(args: argparse.Namespace) -> int:
     spans = args.spans_per_trace
     sessions = args.traces_per_session
     roots = args.root_spans_per_trace
+    text_bytes = args.text_bytes
     config = Config(
         number_of_spans=args.number_of_spans,
         number_of_traces=args.number_of_traces,
@@ -220,6 +229,8 @@ def _generate(args: argparse.Namespace) -> int:
         days=args.days,
         llm_fraction=args.llm_fraction,
         session_id_missing_fraction=args.session_id_missing_fraction,
+        min_text_bytes=text_bytes[0],
+        max_text_bytes=text_bytes[1],
         project=args.project,
         seed=args.seed,
         batch_spans=args.batch_spans,
