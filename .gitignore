@@ -12,3 +12,6 @@ wheels/
 # output
 fixtures/
 .arize-tmp-traces/
+
+# worktrees
+.worktrees/
